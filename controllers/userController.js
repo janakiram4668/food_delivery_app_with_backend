@@ -30,11 +30,20 @@ exports.login = async (req, res) => {
     if (!isMatch) return res.status(401).json({ message: 'Invalid email or password' });
 
     const token = user.generateAuthToken();
-    res.status(200).json({ message: 'Login successful', token , user });
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        role: user.role, // Include the role here
+      },
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
 
 // Get user profile
 exports.getProfile = async (req, res) => {

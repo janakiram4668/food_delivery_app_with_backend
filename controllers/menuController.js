@@ -1,5 +1,5 @@
 const MenuItem = require('../models/menuItem');
-const Restaurant = require('../models/restaurant');
+const Restaurant = require('../models/Restaurant');
 
 // Add menu item to a restaurant
 exports.addMenuItem = async (req, res) => {

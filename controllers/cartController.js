@@ -1,131 +1,61 @@
-const Cart = require('../models/cart'); // Replace with your cart model
-const MenuItem = require('../models/menuItem'); // Ensure the MenuItem schema is imported
+const cartItem = require('../models/cartItem');
+const Restaurant = require('../models/Restaurant');
 
-// Add a menu item to the cart
-const addToCart = async (req, res) => {
+// Add item to cart
+exports.addToCart = async (req, res) => {
   try {
-    const { menuItemId, quantity } = req.body;
+    const { itemId, name, price, quantity, userId, restaurantId } = req.body;
 
-    if (!menuItemId || !quantity) {
-      return res.status(400).json({ message: 'Menu item ID and quantity are required' });
+    if (!itemId || !name || !price || !quantity || !userId || !restaurantId) {
+      return res.status(400).json({ error: "All fields are required" });
     }
 
-    const menuItem = await MenuItem.findById(menuItemId);
-
-    if (!menuItem) {
-      return res.status(404).json({ message: 'Menu item not found' });
-    }
-
-    // Add menu item to cart
-    const cartItem = {
-      menuItem: menuItem._id,
-      quantity,
-      price: menuItem.price * quantity,
-    };
-
-    const cart = await Cart.findOne();
-    if (!cart) {
-      // If no cart exists, create a new one
-      const newCart = new Cart({ items: [cartItem] });
-      await newCart.save();
-      return res.status(201).json(newCart);
-    }
-
-    // If cart exists, add or update the item
-    const itemIndex = cart.items.findIndex((item) => item.menuItem.toString() === menuItemId);
-    if (itemIndex > -1) {
-      cart.items[itemIndex].quantity += quantity;
-      cart.items[itemIndex].price = menuItem.price * cart.items[itemIndex].quantity;
-    } else {
-      cart.items.push(cartItem);
-    }
-
-    await cart.save();
-    res.status(201).json(cart);
+    const cartItems = new cartItem({ itemId, name, price, quantity, userId, restaurantId });
+    await cartItems.save();
+    res.status(201).json({ message: "Item added to cart successfully", cartItems });
   } catch (error) {
-    console.error('Error adding to cart:', error.message);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error("Error adding item to cart:", error);
+    res.status(500).json({ error: "Failed to add item to cart" });
   }
 };
 
-// Remove a menu item from the cart
-const removeFromCart = async (req, res) => {
+// Get all cart items for a user
+exports.getCartItems = async (req, res) => {
   try {
-    const { menuItemId } = req.params;
+    const { userId } = req.params; // Get userId from URL
+    const cartItems = await cartItem.find({ userId }) // Find items for the specific user
+      .populate('restaurantId', 'name') // Populate restaurant name
+      .exec();
 
-    const cart = await Cart.findOne();
-
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
+    if (!cartItems) {
+      return res.status(404).json({ error: 'No items found in the cart' });
     }
 
-    const itemIndex = cart.items.findIndex((item) => item.menuItem.toString() === menuItemId);
-
-    if (itemIndex === -1) {
-      return res.status(404).json({ message: 'Menu item not found in cart' });
-    }
-
-    cart.items.splice(itemIndex, 1);
-    await cart.save();
-    res.status(200).json(cart);
+    res.status(200).json(cartItems); // Send cart items as response
   } catch (error) {
-    console.error('Error removing from cart:', error.message);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    console.error('Error fetching cart items:', error);
+    res.status(500).json({ error: 'Failed to fetch cart items' });
   }
 };
 
-// Update quantity of a cart item
-const updateCartItemQuantity = async (req, res) => {
+// Remove an item from the cart
+exports.removeFromCart = async (req, res) => {
   try {
-    const { menuItemId, quantity } = req.body;
-
-    if (!menuItemId || !quantity) {
-      return res.status(400).json({ message: 'Menu item ID and quantity are required' });
-    }
-
-    const cart = await Cart.findOne();
-
-    if (!cart) {
-      return res.status(404).json({ message: 'Cart not found' });
-    }
-
-    const itemIndex = cart.items.findIndex((item) => item.menuItem.toString() === menuItemId);
-
-    if (itemIndex === -1) {
-      return res.status(404).json({ message: 'Menu item not found in cart' });
-    }
-
-    cart.items[itemIndex].quantity = quantity;
-    cart.items[itemIndex].price =
-      quantity * (await MenuItem.findById(menuItemId)).price;
-
-    await cart.save();
-    res.status(200).json(cart);
+    const { cartItemId } = req.params;
+    await cartItem.findByIdAndDelete(cartItemId);
+    res.status(200).json({ message: 'Item removed from cart successfully' });
   } catch (error) {
-    console.error('Error updating cart item quantity:', error.message);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Failed to remove item from cart' });
   }
 };
 
-// Get all cart items
-const getCartItems = async (req, res) => {
+// Clear the entire cart for a user
+exports.clearCart = async (req, res) => {
   try {
-    const cart = await Cart.findOne().populate('items.menuItem');
-
-    if (!cart || cart.items.length === 0) {
-      return res.status(404).json({ message: 'Cart is empty' });
-    }
-
-    res.status(200).json(cart);
+    const { userId } = req.params;
+    await cartItem.deleteMany({ userId });
+    res.status(200).json({ message: 'Cart cleared successfully' });
   } catch (error) {
-    console.error('Error fetching cart items:', error.message);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    res.status(500).json({ error: 'Failed to clear cart' });
   }
-};
-
-module.exports = {
-  addToCart,
-  removeFromCart,
-  updateCartItemQuantity,
-  getCartItems,
 };
